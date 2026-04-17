@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sound Open Air Štvanice — Meta Ads Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --bg2: #13131f;
+    --card: #1a1a2e;
+    --card2: #1e1e32;
+    --border: #2a2a45;
+    --blue: #4f8ef7;
+    --blue-dim: #2a4a8a;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --green: #2ecc71;
+    --yellow: #f1c40f;
+    --red: #e74c3c;
+    --orange: #e67e22;
+    --purple: #9b59b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #0a0a15 0%, #0f0f1a 40%, #111128 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .header-left h1 { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+  .header-left h1 span { color: var(--blue); }
+  .header-left .subtitle { font-size: 11px; color: var(--text-dim); margin-top: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .event-badge {
+    background: linear-gradient(135deg, #1a1a35, #1e1e3a);
+    border: 1px solid var(--blue-dim);
+    border-radius: 10px;
+    padding: 10px 20px;
+    text-align: center;
+  }
+  .event-badge .days { font-size: 32px; font-weight: 800; color: var(--blue); line-height: 1; }
+  .event-badge .days-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+  .event-badge .event-date { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .updated-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+  }
+  .updated-badge strong { color: var(--green); }
+
+  .main { padding: 20px 28px; max-width: 1600px; margin: 0 auto; }
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .alert {
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;
+    font-size: 13px; display: flex; align-items: center; gap: 10px;
+  }
+  .alert.info { background: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.3); color: #a0c4ff; }
+  .alert.warn { background: rgba(241,196,15,0.1); border: 1px solid rgba(241,196,15,0.3); color: #fde68a; }
+  .alert.success { background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); color: #86efac; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+    position: relative; overflow: hidden;
+  }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--blue); opacity: 0.6; }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-card.yellow::before { background: var(--yellow); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.orange::before { background: var(--orange); }
+  .kpi-card.purple::before { background: var(--purple); }
+  .kpi-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .kpi-sub .highlight { color: var(--blue); font-weight: 500; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .section-gap { margin-bottom: 20px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    background: var(--bg2); color: var(--text-dim); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 8px 10px; text-align: left; cursor: pointer;
+    white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+  th:hover { color: var(--blue); }
+  th.sorted { color: var(--blue); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:hover td { background: var(--card2); }
+  .best-performer td { background: rgba(46,204,113,0.04); }
+
+  /* BADGES */
+  .badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.3px; }
+  .badge-active { background: rgba(46,204,113,0.15); color: var(--green); border: 1px solid rgba(46,204,113,0.3); }
+  .badge-paused { background: rgba(231,76,60,0.15); color: var(--red); border: 1px solid rgba(231,76,60,0.3); }
+  .badge-new { background: rgba(79,142,247,0.15); color: var(--blue); border: 1px solid rgba(79,142,247,0.3); }
+  .badge-warn { background: rgba(241,196,15,0.15); color: var(--yellow); border: 1px solid rgba(241,196,15,0.3); }
+
+  .roas-red { color: var(--red); font-weight: 600; }
+  .roas-yellow { color: var(--yellow); font-weight: 600; }
+  .roas-green { color: var(--green); font-weight: 600; }
+  .roas-zero { color: var(--text-dim); }
+
+  .col-spend { color: #c8a0ff; }
+  .col-purchases { color: var(--green); }
+  .col-revenue { color: #60d8b0; }
+
+  /* COPYABLE */
+  .copyable {
+    cursor: pointer; font-family: monospace; font-size: 11px;
+    color: var(--blue); background: rgba(79,142,247,0.08);
+    border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 4px; padding: 2px 6px;
+    transition: background 0.15s;
+  }
+  .copyable:hover { background: rgba(79,142,247,0.2); }
+  .copyable.copied { background: rgba(46,204,113,0.2); color: var(--green); border-color: rgba(46,204,113,0.3); }
+
+  /* FUNNEL */
+  .funnel-container { display: flex; align-items: center; gap: 0; padding: 8px 0; }
+  .funnel-step { flex: 1; text-align: center; }
+  .funnel-bar {
+    background: linear-gradient(135deg, var(--blue-dim), #1a2a5a);
+    border: 1px solid var(--blue-dim); border-radius: 8px;
+    padding: 16px 12px; margin: 0 4px;
+  }
+  .funnel-num { font-size: 22px; font-weight: 700; color: var(--blue); }
+  .funnel-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .funnel-arrow { font-size: 18px; color: var(--border); padding: 0 4px; text-align: center; }
+  .funnel-rate { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ADSET STATUS CARDS */
+  .campaign-block {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .campaign-block-title {
+    font-size: 11px; font-weight: 700; color: var(--text);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* STAT ROWS */
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(42,42,69,0.5); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-key { color: var(--text-dim); font-size: 12px; }
+  .stat-val { color: var(--text); font-weight: 600; font-size: 12px; }
+
+  /* PROGRESS BAR */
+  .progress-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--blue); transition: width 0.4s; }
+
+  /* TIMELINE / GANTT */
+  .gantt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .gantt-label { width: 180px; flex-shrink: 0; color: var(--text-dim); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+  .gantt-track { flex: 1; height: 28px; background: var(--bg); border-radius: 6px; position: relative; overflow: hidden; }
+  .gantt-bar {
+    position: absolute; height: 100%; border-radius: 6px;
+    display: flex; align-items: center; padding: 0 8px;
+    font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.9);
+    overflow: hidden; white-space: nowrap;
+  }
+
+  /* CHART */
+  .chart-wrap { height: 200px; }
+
+  /* PLACEMENT BARS */
+  .placement-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .placement-label { width: 130px; flex-shrink: 0; color: var(--text-dim); }
+  .placement-bar-wrap { flex: 1; height: 22px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .placement-bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.9); }
+  .placement-value { width: 36px; text-align: right; font-weight: 600; }
+
+  /* MOBILE */
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .main { padding: 12px 14px; }
+    .header { flex-direction: column; gap: 10px; }
+    .gantt-label { width: 100px; }
+  }
+
+  /* SCROLL */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <h1>Sound Open Air <span>Štvanice</span> — Meta Ads Dashboard</h1>
+    <div class="subtitle">YTD Jan 1 – Apr 17, 2026 · G Sound excluded · Kampaně reaktivovány 17.4</div>
+  </div>
+  <div class="header-right">
+    <div class="updated-badge">Aktualizováno <strong id="todayDate"></strong></div>
+    <div class="event-badge">
+      <div class="days" id="countdown">—</div>
+      <div class="days-label">days to event</div>
+      <div class="event-date">23.05.2026</div>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- STATUS ALERT -->
+  <div class="alert success">
+    ✅ 17.4.2026 — Kampaně reaktivovány. Vítězná kreativa <strong>951308673908762</strong> (ROAS 23.7×) přidána do 5 adsetů. CAPI webhook aktivní.
+  </div>
+
+  <!-- KPI SECTION -->
+  <div class="section-title">Key Performance Indicators — YTD</div>
+  <div class="kpi-row section-gap">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Spend</div>
+      <div class="kpi-value">56 061</div>
+      <div class="kpi-sub"><span class="highlight">CZK</span> · Jan–Apr 17</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Purchases</div>
+      <div class="kpi-value" style="color:var(--green)">34</div>
+      <div class="kpi-sub">+ est. 10–15 pixelový výpadek</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Revenue</div>
+      <div class="kpi-value" style="color:#60d8b0">33 990</div>
+      <div class="kpi-sub"><span class="highlight">CZK</span> · ticket 590 CZK</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">ROAS</div>
+      <div class="kpi-value" style="color:var(--yellow)">0.61×</div>
+      <div class="kpi-sub">Bez výpadku est. <span class="highlight">~0.75×</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">CPA</div>
+      <div class="kpi-value" style="font-size:18px">1 649 CZK</div>
+      <div class="kpi-sub">Breakeven <span class="highlight">590 CZK</span></div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">Days to Event</div>
+      <div class="kpi-value" id="kpi-countdown" style="color:var(--orange)">—</div>
+      <div class="kpi-sub">23.05.2026 · <span class="highlight">Urgent</span></div>
+    </div>
+  </div>
+
+  <!-- SECONDARY KPIs -->
+  <div class="grid-3 section-gap">
+    <div class="card">
+      <div class="card-title">Reach &amp; Frequency</div>
+      <div class="stat-row"><span class="stat-key">Reach</span><span class="stat-val">360 004</span></div>
+      <div class="stat-row"><span class="stat-key">Frequency</span><span class="stat-val">3.84×</span></div>
+      <div class="stat-row"><span class="stat-key">Impressions</span><span class="stat-val">1 070 254</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Click Performance</div>
+      <div class="stat-row"><span class="stat-key">Clicks (all)</span><span class="stat-val">30 626</span></div>
+      <div class="stat-row"><span class="stat-key">CTR avg.</span><span class="stat-val">2.86%</span></div>
+      <div class="stat-row"><span class="stat-key">CPC avg.</span><span class="stat-val">1.83 CZK</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Conversion Funnel</div>
+      <div class="stat-row"><span class="stat-key">Landing Page Views</span><span class="stat-val">7 807</span></div>
+      <div class="stat-row"><span class="stat-key">Checkouts initiated</span><span class="stat-val">179</span></div>
+      <div class="stat-row"><span class="stat-key">Purchases</span><span class="stat-val" style="color:var(--green)">34</span></div>
+    </div>
+  </div>
+
+  <!-- FUNNEL -->
+  <div class="section-title">Conversion Funnel</div>
+  <div class="card section-gap">
+    <div class="funnel-container">
+      <div class="funnel-step">
+        <div class="funnel-bar">
+          <div class="funnel-num">30 626</div>
+          <div class="funnel-label">Clicks</div>
+        </div>
+      </div>
+      <div class="funnel-arrow">→<div class="funnel-rate">25.5%</div></div>
+      <div class="funnel-step">
+        <div class="funnel-bar">
+          <div class="funnel-num" style="color:#a78bfa">7 807</div>
+          <div class="funnel-label">LPV</div>
+        </div>
+      </div>
+      <div class="funnel-arrow">→<div class="funnel-rate">2.29%</div></div>
+      <div class="funnel-step">
+        <div class="funnel-bar">
+          <div class="funnel-num" style="color:var(--yellow)">179</div>
+          <div class="funnel-label">Checkouts</div>
+        </div>
+      </div>
+      <div class="funnel-arrow">→<div class="funnel-rate">19.0%</div></div>
+      <div class="funnel-step">
+        <div class="funnel-bar" style="background:linear-gradient(135deg,rgba(46,204,113,0.2),rgba(46,204,113,0.1));border-color:rgba(46,204,113,0.4);">
+          <div class="funnel-num" style="color:var(--green)">34</div>
+          <div class="funnel-label">Purchases</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:24px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);">
+      <span>Click→LPV: <strong style="color:#a78bfa">25.5%</strong></span>
+      <span>LPV→Checkout: <strong style="color:var(--yellow)">2.29%</strong></span>
+      <span>Checkout→Purchase: <strong style="color:var(--green)">19.0%</strong></span>
+      <span>Overall: <strong style="color:var(--text)">0.11%</strong></span>
+    </div>
+  </div>
+
+  <!-- WEEKLY TREND + PLACEMENTS -->
+  <div class="grid-2 section-gap">
+    <div class="card">
+      <div class="card-title">
+        Weekly Trend — Spend &amp; Purchases
+        <div style="display:flex;gap:12px;font-size:11px;font-weight:400;color:var(--text-dim);">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#4f8ef7;border-radius:2px;display:inline-block;"></span>Spend</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#2ecc71;border-radius:50%;display:inline-block;"></span>Purchases</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="weeklyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Placement — Purchases &amp; CPA</div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Purchases by Placement</div>
+        <div class="placement-row">
+          <div class="placement-label">Facebook Feed</div>
+          <div class="placement-bar-wrap"><div class="placement-bar-fill" style="width:100%;background:linear-gradient(90deg,#4f8ef7,#2a5ab5);">31</div></div>
+          <div class="placement-value" style="color:var(--green)">31</div>
+        </div>
+        <div class="placement-row">
+          <div class="placement-label">Instagram Feed</div>
+          <div class="placement-bar-wrap"><div class="placement-bar-fill" style="width:35.5%;background:linear-gradient(90deg,#c678f7,#8a45b5);">11</div></div>
+          <div class="placement-value" style="color:var(--green)">11</div>
+        </div>
+        <div class="placement-row">
+          <div class="placement-label">IG Stories</div>
+          <div class="placement-bar-wrap"><div class="placement-bar-fill" style="width:32.3%;background:linear-gradient(90deg,#e67e22,#b05a10);">10</div></div>
+          <div class="placement-value" style="color:var(--green)">10</div>
+        </div>
+        <div class="placement-row">
+          <div class="placement-label">IG Reels</div>
+          <div class="placement-bar-wrap"><div class="placement-bar-fill" style="width:16.1%;background:linear-gradient(90deg,#555,#333);">5</div></div>
+          <div class="placement-value" style="color:var(--text-dim)">5</div>
+        </div>
+        <div class="placement-row">
+          <div class="placement-label">FB Reels</div>
+          <div class="placement-bar-wrap"><div class="placement-bar-fill" style="width:3%;background:linear-gradient(90deg,#333,#222);">0</div></div>
+          <div class="placement-value" style="color:var(--red)">0</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">💡 Facebook Feed dominuje (91% purchases). Reels = 0 — vyloučit z budoucích kampaní.</div>
+    </div>
+  </div>
+
+  <!-- AD SET PERFORMANCE -->
+  <div class="section-title">Ad Set Performance — Aktivní kampaně (poslední 90 dní)</div>
+
+  <!-- CAMPAIGN BLOCKS -->
+  <div class="grid-2 section-gap">
+
+    <!-- SALES CAMPAIGN -->
+    <div class="card">
+      <div class="card-title">
+        🛒 24/2 Sales Campaign
+        <span class="badge badge-active">Reaktivována 17.4</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ad Set</th>
+              <th>Spend</th>
+              <th>Nákupy</th>
+              <th>Revenue</th>
+              <th>ROAS</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="best-performer">
+              <td><strong>★ 2/4 GOSales</strong></td>
+              <td class="col-spend">1 532</td>
+              <td class="col-purchases">9</td>
+              <td class="col-revenue">5 190</td>
+              <td><span class="roas-green">3.39×</span></td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>24/2 Sales (orig.)</td>
+              <td class="col-spend">3 208</td>
+              <td class="col-purchases">7</td>
+              <td class="col-revenue">3 450</td>
+              <td><span class="roas-yellow">1.08×</span></td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>2/4 RASales <span class="badge badge-new">+kreativa</span></td>
+              <td class="col-spend">445</td>
+              <td class="col-purchases">0</td>
+              <td class="col-revenue">—</td>
+              <td><span class="roas-zero">—</span></td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+            <tr>
+              <td>14/4 GOSales FB <span class="badge badge-new">+kreativa</span></td>
+              <td class="col-spend">215</td>
+              <td class="col-purchases">—</td>
+              <td class="col-revenue">—</td>
+              <td><span class="roas-zero">Nové</span></td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+            <tr>
+              <td>14/4 GOSales IG</td>
+              <td class="col-spend">187</td>
+              <td class="col-purchases">—</td>
+              <td class="col-revenue">—</td>
+              <td><span class="roas-zero">Nové</span></td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TRAFFIC CAMPAIGN -->
+    <div class="card">
+      <div class="card-title">
+        🚗 24/2 Traffic Campaign
+        <span class="badge badge-active">Reaktivována 17.4</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ad Set</th>
+              <th>Spend</th>
+              <th>LPVs</th>
+              <th>CTR</th>
+              <th>CPC</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="best-performer">
+              <td><strong>★ Traffic custom</strong></td>
+              <td class="col-spend">4 972</td>
+              <td class="col-purchases">2 212</td>
+              <td><span style="color:var(--green)">4.25%</span></td>
+              <td>1.25</td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>Traffic lal</td>
+              <td class="col-spend">1 660</td>
+              <td class="col-purchases">355</td>
+              <td>3.31%</td>
+              <td>1.60</td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>Traffic zajmy+expats</td>
+              <td class="col-spend">1 654</td>
+              <td class="col-purchases">283</td>
+              <td>2.87%</td>
+              <td>1.86</td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>Traffic B FB</td>
+              <td class="col-spend">173</td>
+              <td class="col-purchases">—</td>
+              <td>—</td>
+              <td>1.36</td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+            <tr>
+              <td>Traffic B IG</td>
+              <td class="col-spend">217</td>
+              <td class="col-purchases">—</td>
+              <td>—</td>
+              <td>1.57</td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ASC CAMPAIGN -->
+    <div class="card">
+      <div class="card-title">
+        ⚡ ASC Sales 22/3
+        <span class="badge badge-active">Reaktivována 17.4</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ad Set</th>
+              <th>Spend</th>
+              <th>Nákupy</th>
+              <th>Revenue</th>
+              <th>ROAS</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Advantage+ GoOut <span class="badge badge-new">+kreativa</span></td>
+              <td class="col-spend">1 625</td>
+              <td class="col-purchases">2</td>
+              <td class="col-revenue">850</td>
+              <td><span class="roas-red">0.52×</span></td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+            <tr>
+              <td>Advantage+ Broad <span class="badge badge-new">+kreativa</span></td>
+              <td class="col-spend">154</td>
+              <td class="col-purchases">0</td>
+              <td class="col-revenue">—</td>
+              <td><span class="roas-zero">—</span></td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:10px;">💡 ASC potřebuje 7–14 dní učení po reaktivaci. Pixel funguje + CAPI aktivní — konverze teď správně reportuje.</div>
+    </div>
+
+    <!-- EVENT RESPONSE CAMPAIGN -->
+    <div class="card">
+      <div class="card-title">
+        🎪 18/12 Event Response
+        <span class="badge badge-active">Zachována</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ad Set</th>
+              <th>Spend</th>
+              <th>RSVPs</th>
+              <th>CZK/RSVP</th>
+              <th>CTR</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="best-performer">
+              <td><strong>★ 24/3 event</strong></td>
+              <td class="col-spend">2 455</td>
+              <td class="col-purchases">462</td>
+              <td><span style="color:var(--green)">5.31 CZK</span></td>
+              <td><span style="color:var(--green)">3.89%</span></td>
+              <td><span class="badge badge-active">Active</span></td>
+            </tr>
+            <tr>
+              <td>18/12 event (orig.)</td>
+              <td class="col-spend">8 790</td>
+              <td class="col-purchases">1 071</td>
+              <td>8.21 CZK</td>
+              <td>2.50%</td>
+              <td><span class="badge badge-warn">Paused</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:10px;">💡 18/12 orig. má 1 071 RSVPs = social proof. Reaktivuj na 150 CZK/den pro event attendance push.</div>
+    </div>
+  </div>
+
+  <!-- CAMPAIGN TABLE (YTD) -->
+  <div class="section-title">Přehled kampaní — YTD výkonnost</div>
+  <div class="card section-gap">
+    <div class="table-wrap">
+      <table id="campaignTable">
+        <thead>
+          <tr>
+            <th onclick="sortT('campaignTable',0)" data-col="0">Kampaň</th>
+            <th onclick="sortT('campaignTable',1)" data-col="1">Spend CZK</th>
+            <th onclick="sortT('campaignTable',2)" data-col="2">Nákupy</th>
+            <th onclick="sortT('campaignTable',3)" data-col="3">Revenue CZK</th>
+            <th onclick="sortT('campaignTable',4)" data-col="4">ROAS</th>
+            <th onclick="sortT('campaignTable',5)" data-col="5">CTR</th>
+            <th onclick="sortT('campaignTable',6)" data-col="6">CPC</th>
+            <th onclick="sortT('campaignTable',7)" data-col="7">LPV</th>
+            <th onclick="sortT('campaignTable',8)" data-col="8">Checkouts</th>
+            <th onclick="sortT('campaignTable',9)" data-col="9">CPA</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="campaignBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TOP CREATIVES -->
+  <div class="section-title">Top Creative Performers</div>
+  <div class="card section-gap">
+    <div class="card-title">
+      Top Ads by ROAS
+      <span style="font-size:11px;color:var(--text-dim);font-weight:400">★ = vítězná kreativa · klikni ID pro kopírování</span>
+    </div>
+    <div class="table-wrap">
+      <table id="adsTable">
+        <thead>
+          <tr>
+            <th onclick="sortT('adsTable',0)" data-col="0">Název reklamy</th>
+            <th onclick="sortT('adsTable',1)" data-col="1">Ad ID</th>
+            <th>Creative ID</th>
+            <th onclick="sortT('adsTable',3)" data-col="3">Spend</th>
+            <th onclick="sortT('adsTable',4)" data-col="4">CTR</th>
+            <th onclick="sortT('adsTable',5)" data-col="5">Nákupy</th>
+            <th onclick="sortT('adsTable',6)" data-col="6">Revenue</th>
+            <th onclick="sortT('adsTable',7)" data-col="7">ROAS</th>
+          </tr>
+        </thead>
+        <tbody id="adsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PLAN / GANTT -->
+  <div class="section-title">Plán Kampaní — Zbývající dny (17.4 – 23.5.2026)</div>
+  <div class="card section-gap">
+    <div class="card-title">Timeline — 37 dní do eventu</div>
+    <div id="ganttContainer"></div>
+    <div class="grid-4" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Traffic (24/2)</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">200 CZK/den</div>
+        <div style="font-size:10px;color:var(--text-dim);">Traffic custom – škálovat</div>
+        <div style="margin-top:6px;"><span class="badge badge-active">Aktivní</span></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">GOSales (2/4)</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">400 CZK/den</div>
+        <div style="font-size:10px;color:var(--text-dim);">ROAS 3.39× – hlavní engine</div>
+        <div style="margin-top:6px;"><span class="badge badge-active">Škálovat</span></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">ASC Sales</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">500 CZK/den</div>
+        <div style="font-size:10px;color:var(--text-dim);">Advantage+ – nechej učit 7d</div>
+        <div style="margin-top:6px;"><span class="badge badge-warn">Learning</span></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Event Response</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">250 CZK/den</div>
+        <div style="font-size:10px;color:var(--text-dim);">5.31 CZK/RSVP – efektivní</div>
+        <div style="margin-top:6px;"><span class="badge badge-active">Aktivní</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TECH STATUS -->
+  <div class="section-title">Technický Status</div>
+  <div class="grid-3 section-gap">
+    <div class="card">
+      <div class="card-title">🔌 Tracking Stack</div>
+      <div class="stat-row"><span class="stat-key">Meta Pixel</span><span class="stat-val" style="color:var(--green)">✓ Aktivní</span></div>
+      <div class="stat-row"><span class="stat-key">CAPI (Conversions API)</span><span class="stat-val" style="color:var(--green)">✓ Webhook live</span></div>
+      <div class="stat-row"><span class="stat-key">GoOut → Meta Webhook</span><span class="stat-val" style="color:var(--yellow)">⚙ Aktivovat</span></div>
+      <div class="stat-row"><span class="stat-key">Pixel výpadek</span><span class="stat-val" style="color:var(--red)">31.3–6.4 (fix)</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🎨 Winning Creative</div>
+      <div class="stat-row"><span class="stat-key">Creative ID</span><span class="copyable" onclick="copyText(this,'951308673908762')" title="Klikni pro kopírování">951308673908762</span></div>
+      <div class="stat-row"><span class="stat-key">ROAS</span><span class="stat-val" style="color:var(--green)">23.7×</span></div>
+      <div class="stat-row"><span class="stat-key">Přidána do adsetů</span><span class="stat-val" style="color:var(--green)">5 adsetů ✓</span></div>
+      <div class="stat-row"><span class="stat-key">Datum</span><span class="stat-val">17.4.2026</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Make.com Scenario</div>
+      <div class="stat-row"><span class="stat-key">ID</span><span class="stat-val">9067806</span></div>
+      <div class="stat-row"><span class="stat-key">Webhook</span><span class="stat-val">GoOut → CAPI</span></div>
+      <div class="stat-row"><span class="stat-key">Status</span><span class="stat-val" style="color:var(--yellow)">⚙ Ručně aktivovat</span></div>
+      <div class="stat-row"><span class="stat-key">Akce</span><span class="stat-val" style="font-size:10px">Doplnit System User Token</span></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+
+const campaigns = [
+  { name:'18/12 Event Response', spend:11143, purchases:2,  revenue:1700,  ctr:2.80, cpc:1.77, lpv:123,  checkouts:1,  status:'active'  },
+  { name:'18/12 Interest',       spend:12518, purchases:3,  revenue:4050,  ctr:3.00, cpc:1.57, lpv:196,  checkouts:1,  status:'paused'  },
+  { name:'12/2 Traffic',         spend:3499,  purchases:0,  revenue:0,     ctr:3.31, cpc:1.67, lpv:950,  checkouts:0,  status:'paused'  },
+  { name:'24/2 Traffic',         spend:8284,  purchases:12, revenue:10960, ctr:3.77, cpc:1.40, lpv:2850, checkouts:164,status:'active'  },
+  { name:'24/2 Sales',           spend:5203,  purchases:14, revenue:13880, ctr:2.94, cpc:3.08, lpv:488,  checkouts:12, status:'active'  },
+  { name:'ASC Sales 22/3',       spend:1779,  purchases:2,  revenue:1700,  ctr:2.30, cpc:3.54, lpv:94,   checkouts:1,  status:'active'  },
+  { name:'31/3 Traffic-A',       spend:3288,  purchases:0,  revenue:0,     ctr:4.14, cpc:1.31, lpv:1307, checkouts:0,  status:'paused'  },
+  { name:'31/3 Traffic-B',       spend:3829,  purchases:1,  revenue:1700,  ctr:4.12, cpc:1.33, lpv:1703, checkouts:0,  status:'paused'  },
+  { name:'24/2 Zájem',           spend:2268,  purchases:0,  revenue:0,     ctr:0.24, cpc:49.3, lpv:3,    checkouts:0,  status:'paused'  },
+  { name:'2/4 Engagement',       spend:3080,  purchases:0,  revenue:0,     ctr:0.69, cpc:6.16, lpv:4,    checkouts:0,  status:'paused'  },
+  { name:'11/4 Reach',           spend:868,   purchases:0,  revenue:0,     ctr:0.11, cpc:15.78,lpv:1,    checkouts:0,  status:'paused'  },
+];
+
+const ads = [
+  { name:'★ 1/3 Sales post',     adId:'120243090431020116', creativeId:'951308673908762', spend:215,  ctr:1.50, purchases:3, revenue:5100, roas:23.7,  best:true  },
+  { name:'Sales kopie',           adId:'120242992131680116', creativeId:'',               spend:839,  ctr:3.35, purchases:2, revenue:1800, roas:2.14,  best:false },
+  { name:'24/2 Traffic main',     adId:'120242909325810116', creativeId:'3047320362324858',spend:2104,ctr:3.72, purchases:4, revenue:4000, roas:1.90,  best:false },
+  { name:'15/12 fb interest',     adId:'120241653489040116', creativeId:'893275543665099', spend:2843, ctr:5.00, purchases:3, revenue:4050, roas:1.42,  best:false },
+  { name:'1/3 Colab kopie',       adId:'120243090709460116', creativeId:'903286015884241', spend:36,   ctr:7.58, purchases:0, revenue:0,    roas:0,     best:false },
+  { name:'Traffic kopie kopie',   adId:'120242992080300116', creativeId:'3047320362324858',spend:1401, ctr:6.01, purchases:0, revenue:0,    roas:0,     best:false },
+  { name:'8/2 fb interest',       adId:'120242179942970116', creativeId:'',               spend:589,  ctr:7.39, purchases:0, revenue:0,    roas:0,     best:false },
+  { name:'1/3 Sales post kopie',  adId:'120243090578760116', creativeId:'',               spend:467,  ctr:4.73, purchases:0, revenue:0,    roas:0,     best:false },
+  { name:'18/12 fb interest',     adId:'120240436224830116', creativeId:'',               spend:1183, ctr:6.16, purchases:0, revenue:0,    roas:0,     best:false },
+];
+
+const weekly = [
+  { week:'Mar 17–23',      spend:4230, purchases:13, revenue:4150 },
+  { week:'Mar 24–30',      spend:3148, purchases:2,  revenue:850  },
+  { week:'Mar 31–Apr 6',   spend:6914, purchases:0,  revenue:0    },
+  { week:'Apr 7–13',       spend:6689, purchases:3,  revenue:3400 },
+  { week:'Apr 14–17',      spend:2644, purchases:5,  revenue:1790 },
+];
+
+// ─── COUNTDOWN ────────────────────────────────────────────────────────────────
+function computeDays() {
+  const event = new Date('2026-05-23');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.ceil((event - today) / 86400000));
+}
+const days = computeDays();
+document.getElementById('countdown').textContent = days;
+document.getElementById('kpi-countdown').textContent = days;
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString('cs-CZ');
+
+// ─── FORMAT ───────────────────────────────────────────────────────────────────
+function fmt(n, d=0) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return n.toLocaleString('cs-CZ', {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function roasBadge(r) {
+  if (!r || r === 0) return `<span class="roas-zero">—</span>`;
+  const cls = r < 0.5 ? 'roas-red' : r < 1.0 ? 'roas-yellow' : 'roas-green';
+  return `<span class="${cls}">${fmt(r,2)}×</span>`;
+}
+
+// ─── CAMPAIGNS TABLE ──────────────────────────────────────────────────────────
+function renderCampaigns() {
+  const tbody = document.getElementById('campaignBody');
+  tbody.innerHTML = campaigns.map(c => {
+    const roas = c.revenue > 0 ? c.revenue / c.spend : 0;
+    const cpa  = c.purchases > 0 ? c.spend / c.purchases : null;
+    const statusBadge = c.status === 'active'
+      ? `<span class="badge badge-active">Aktivní</span>`
+      : `<span class="badge badge-paused">Paused</span>`;
+    return `<tr>
+      <td>${c.name}</td>
+      <td class="col-spend">${fmt(c.spend)}</td>
+      <td class="col-purchases">${c.purchases || '—'}</td>
+      <td class="col-revenue">${c.revenue ? fmt(c.revenue) : '—'}</td>
+      <td>${roasBadge(roas)}</td>
+      <td>${fmt(c.ctr,2)}%</td>
+      <td>${fmt(c.cpc,2)}</td>
+      <td>${fmt(c.lpv)}</td>
+      <td>${c.checkouts || '—'}</td>
+      <td>${cpa ? fmt(cpa,0) + ' CZK' : '<span class="roas-zero">—</span>'}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+}
+renderCampaigns();
+
+// ─── ADS TABLE ────────────────────────────────────────────────────────────────
+function renderAds() {
+  const tbody = document.getElementById('adsBody');
+  tbody.innerHTML = ads.map(a => {
+    const creativeCell = a.creativeId
+      ? `<span class="copyable" onclick="copyText(this,'${a.creativeId}')" title="Klikni pro kopírování">${a.creativeId}</span>`
+      : '<span class="roas-zero">—</span>';
+    return `<tr class="${a.best ? 'best-performer' : ''}">
+      <td><strong>${a.name}</strong></td>
+      <td><span class="copyable" onclick="copyText(this,'${a.adId}')" title="Klikni pro kopírování">${a.adId.slice(0,14)}…</span></td>
+      <td style="font-size:11px;">${creativeCell}</td>
+      <td class="col-spend">${fmt(a.spend)}</td>
+      <td>${fmt(a.ctr,2)}%</td>
+      <td class="col-purchases">${a.purchases || '—'}</td>
+      <td class="col-revenue">${a.revenue ? fmt(a.revenue) : '—'}</td>
+      <td>${roasBadge(a.roas)}</td>
+    </tr>`;
+  }).join('');
+}
+renderAds();
+
+// ─── COPY ─────────────────────────────────────────────────────────────────────
+function copyText(el, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = el.textContent;
+    el.classList.add('copied');
+    el.textContent = 'Zkopírováno!';
+    setTimeout(() => { el.classList.remove('copied'); el.textContent = orig; }, 1500);
+  });
+}
+
+// ─── SORT TABLE ───────────────────────────────────────────────────────────────
+let sortState = {};
+function sortT(tableId, col) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  const key   = `${tableId}_${col}`;
+  sortState[key] = !sortState[key];
+  const asc = sortState[key];
+  table.querySelectorAll('th').forEach((th,i) => {
+    th.classList.toggle('sorted', i === col);
+  });
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.textContent.trim().replace(/[^\d.\-]/g,'') || '';
+    const bv = b.cells[col]?.textContent.trim().replace(/[^\d.\-]/g,'') || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return asc ? an-bn : bn-an;
+    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ─── WEEKLY CHART ─────────────────────────────────────────────────────────────
+const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+new Chart(weeklyCtx, {
+  data: {
+    labels: weekly.map(w => w.week),
+    datasets: [
+      {
+        type: 'bar', label: 'Spend (CZK)',
+        data: weekly.map(w => w.spend),
+        backgroundColor: 'rgba(79,142,247,0.5)',
+        borderColor: '#4f8ef7', borderWidth: 1, borderRadius: 4, yAxisID: 'y1',
+      },
+      {
+        type: 'line', label: 'Purchases',
+        data: weekly.map(w => w.purchases),
+        borderColor: '#2ecc71', backgroundColor: 'rgba(46,204,113,0.15)',
+        borderWidth: 2.5, pointBackgroundColor: '#2ecc71',
+        pointRadius: 5, tension: 0.4, fill: true, yAxisID: 'y2',
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1e1e32', borderColor: '#2a2a45', borderWidth: 1,
+        titleColor: '#e8e8f0', bodyColor: '#8888aa',
+        callbacks: {
+          label: (ctx) => ctx.dataset.label === 'Spend (CZK)'
+            ? ` Spend: ${ctx.parsed.y.toLocaleString('cs-CZ')} CZK`
+            : ` Purchases: ${ctx.parsed.y}`
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color:'#8888aa', font:{size:11} }, grid: { color:'rgba(42,42,69,0.5)' } },
+      y1: {
+        type:'linear', position:'left',
+        ticks: { color:'#8888aa', font:{size:11}, callback: v => v.toLocaleString('cs-CZ') },
+        grid: { color:'rgba(42,42,69,0.5)' },
+      },
+      y2: {
+        type:'linear', position:'right',
+        ticks: { color:'#2ecc71', font:{size:11} },
+        grid: { display:false },
+      }
+    }
+  }
+});
+
+// ─── GANTT ───────────────────────────────────────────────────────────────────
+const ganttEl = document.getElementById('ganttContainer');
+const totalDays = 37;
+const today = new Date('2026-04-17');
+
+const ganttItems = [
+  { label: 'Traffic custom',    start: 0,  end: 37, color: '#2a5ab5', text: '200 CZK/den' },
+  { label: 'GOSales (2/4)',      start: 0,  end: 37, color: '#27ae60', text: '400 CZK/den ★' },
+  { label: 'Traffic lal',       start: 0,  end: 37, color: '#3498db', text: '100 CZK/den' },
+  { label: 'Traffic expats',    start: 0,  end: 37, color: '#2980b9', text: '100 CZK/den' },
+  { label: 'ASC Advantage+',    start: 0,  end: 37, color: '#8e44ad', text: '500 CZK/den' },
+  { label: 'Event Response',    start: 0,  end: 37, color: '#e67e22', text: '250 CZK/den' },
+  { label: 'RASales Remarket.', start: 7,  end: 30, color: '#16a085', text: '200 CZK/den' },
+  { label: 'FOMO Hot RTG',      start: 22, end: 35, color: '#c0392b', text: '400 CZK/den' },
+];
+
+ganttEl.innerHTML = ganttItems.map(item => {
+  const left  = (item.start / totalDays) * 100;
+  const width = ((item.end - item.start) / totalDays) * 100;
+  return `
+    <div class="gantt-row">
+      <div class="gantt-label" title="${item.label}">${item.label}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${item.color};">
+          ${item.text}
+        </div>
+      </div>
+    </div>
+  `;
+}).join('');
+</script>
+</body>
+</html>
