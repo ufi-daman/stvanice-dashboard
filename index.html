@@ -516,9 +516,10 @@ function roasBadge(r) {
 }
 
 function statusBadge(s) {
-  return s==='ACTIVE'
-    ? '<span class="badge badge-active">Aktivní</span>'
-    : '<span class="badge badge-paused">Paused</span>';
+  if (s==='ACTIVE') return '<span class="badge badge-active">● Aktivní</span>';
+  if (s==='PAUSED') return '<span class="badge badge-paused">Paused</span>';
+  if (s==='ARCHIVED') return '<span class="badge" style="background:rgba(136,136,170,.15);color:var(--text-dim);border:1px solid var(--border);">Archiv</span>';
+  return '<span class="badge badge-paused">'+s+'</span>';
 }
 
 // ══ LOAD ALL DATA ═════════════════════════════════════════════════
@@ -543,15 +544,27 @@ async function loadOverview() {
   tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;"><div class="spinner" style="margin:auto;width:24px;height:24px;"></div></td></tr>`;
 
   try {
-    const fields = 'campaign_name,campaign_id,spend,impressions,clicks,ctr,cpc,actions,action_values,reach';
-    const d = await apiFetch(`/${AD_ACCOUNT}/insights`, {
-      level: 'campaign',
-      fields,
-      time_range: timeRange(),
-      limit: 100
-    });
+    // Fetch insights + campaign statuses in parallel
+    const [insightsRes, campsRes] = await Promise.all([
+      apiFetch(`/${AD_ACCOUNT}/insights`, {
+        level: 'campaign',
+        fields: 'campaign_name,campaign_id,spend,impressions,clicks,ctr,cpc,actions,action_values,reach',
+        time_range: timeRange(),
+        limit: 100
+      }),
+      apiFetch(`/${AD_ACCOUNT}/campaigns`, {
+        fields: 'id,effective_status',
+        limit: 100
+      })
+    ]);
 
-    const rows = (d.data || []).filter(r => !isGSound(r.campaign_name));
+    // Build status map: campaign_id → effective_status
+    const statusMap = {};
+    (campsRes.data||[]).forEach(c => statusMap[c.id] = c.effective_status);
+
+    const rows = (insightsRes.data||[]).filter(r => !isGSound(r.campaign_name));
+    // Attach real status to each row
+    rows.forEach(r => r._status = statusMap[r.campaign_id] || 'UNKNOWN');
     allCampaigns = rows;
 
     // KPIs
@@ -575,7 +588,7 @@ async function loadOverview() {
     document.getElementById('kpi-ctr').textContent       = fmtPct(ctr);
     document.getElementById('kpi-cpa').textContent       = cpa>0 ? 'CPA ' + fmt(cpa) + ' CZK' : 'CPA —';
 
-    // Table
+    // Table — sorted by spend desc
     tbody.innerHTML = rows.sort((a,b)=>parseFloat(b.spend)-parseFloat(a.spend)).map(r => {
       const purchases = getAction(r.actions,'purchase');
       const revenue   = getActionVal(r.action_values,'purchase');
@@ -589,7 +602,7 @@ async function loadOverview() {
         <td>${fmtPct(parseFloat(r.ctr||0))}</td>
         <td>${fmt(parseFloat(r.cpc||0),2)}</td>
         <td>${fmt(parseFloat(r.reach||0))}</td>
-        <td>${statusBadge('PAUSED')}</td>
+        <td>${statusBadge(r._status)}</td>
       </tr>`;
     }).join('');
 
@@ -776,43 +789,68 @@ function renderCompareTable() {
 // ══════════════════════════════════════════════════════════════════
 async function loadCreatives() {
   const grid = document.getElementById('creativesGrid');
-  grid.innerHTML = `<div class="loading"><div class="spinner"></div>Načítám aktivní reklamy…</div>`;
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div>Načítám kreativy…</div>`;
   try {
-    const d = await apiFetch(`/${AD_ACCOUNT}/ads`, {
-      fields: 'name,adset_name,campaign_name,effective_status,creative{id,thumbnail_url,title,body,image_url},insights.time_range({"since":"'+dateFrom+'","until":"'+dateTo+'"}){spend,impressions,clicks,ctr,actions,action_values}',
-      filtering: JSON.stringify([{field:'effective_status',operator:'IN',value:['ACTIVE','PAUSED']}]),
+    // 1) Fetch ads with creative details (separate from insights — nested time_range unreliable)
+    const adsRes = await apiFetch(`/${AD_ACCOUNT}/ads`, {
+      fields: 'id,name,adset_name,campaign_name,effective_status,creative{id,thumbnail_url,image_url,title,body}',
+      effective_status: JSON.stringify(['ACTIVE','PAUSED']),
       limit: 50
     });
 
-    const ads = (d.data||[]).filter(a => !isGSound(a.campaign_name||'')).slice(0,24);
-    if (!ads.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné reklamy nalezeny.</div>'; return; }
+    const adsRaw = (adsRes.data||[]).filter(a => !isGSound(a.campaign_name||'')).slice(0,30);
+    if (!adsRaw.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné reklamy nalezeny.</div>'; return; }
 
-    grid.innerHTML = ads.map(ad => {
-      const ins  = ad.insights?.data?.[0] || {};
+    // 2) Fetch ad-level insights for the period
+    const insRes = await apiFetch(`/${AD_ACCOUNT}/insights`, {
+      level: 'ad',
+      fields: 'ad_id,spend,impressions,clicks,ctr,cpc,actions,action_values',
+      time_range: timeRange(),
+      limit: 100
+    });
+
+    // Build insights map: ad_id → data
+    const insMap = {};
+    (insRes.data||[]).forEach(i => insMap[i.ad_id] = i);
+
+    // 3) Merge and render
+    grid.innerHTML = adsRaw.map(ad => {
+      const ins  = insMap[ad.id] || {};
       const spend= parseFloat(ins.spend||0);
       const p    = getAction(ins.actions,'purchase');
       const rev  = getActionVal(ins.action_values,'purchase');
       const roas_= rev>0&&spend>0 ? rev/spend : 0;
       const ctr_ = parseFloat(ins.ctr||0);
-      const thumb= ad.creative?.thumbnail_url || ad.creative?.image_url || '';
       const cid  = ad.creative?.id || '';
+      const thumb= ad.creative?.thumbnail_url || ad.creative?.image_url || '';
       const isActive = ad.effective_status==='ACTIVE';
+      const title= ad.creative?.title || ad.creative?.body || '';
 
       return `<div class="creative-card">
         <div class="creative-preview">
-          ${thumb ? `<img src="${thumb}" alt="preview" onerror="this.parentElement.innerHTML='<span style=color:var(--text-dim)>Náhled nedostupný</span>'">` : '<span style="color:var(--text-dim);font-size:11px;">Náhled nedostupný</span>'}
+          ${thumb
+            ? `<img src="${thumb}" alt="preview" crossorigin="anonymous"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+               <div style="display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:11px;padding:10px;text-align:center;">
+                 <div style="font-size:24px;margin-bottom:8px;">🖼</div>
+                 <div>${title||'Náhled vyžaduje přihlášení do FB'}</div>
+               </div>`
+            : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:11px;padding:10px;text-align:center;">
+                 <div style="font-size:24px;margin-bottom:8px;">🖼</div>
+                 <div>${title||'Bez náhledu'}</div>
+               </div>`}
           ${isActive ? '<div style="position:absolute;top:8px;right:8px;"><span class="badge badge-active">● LIVE</span></div>' : ''}
         </div>
         <div class="creative-info">
           <div class="creative-name">${ad.name||'—'}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">${ad.campaign_name||'—'} · ${ad.adset_name||'—'}</div>
-          ${cid ? `<div style="margin-bottom:8px;"><span class="copyable" onclick="copyText(this,'${cid}')" title="Klikni pro kopírování">Creative: ${cid}</span></div>` : ''}
-          <div class="creative-metrics">
-            <div class="c-metric"><div class="c-metric-label">Spend</div><div class="c-metric-val">${fmt(spend)} <small style="font-size:10px;font-weight:400;color:var(--text-dim);">CZK</small></div></div>
+          <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">${ad.adset_name||'—'}</div>
+          ${cid ? `<div style="margin-bottom:8px;"><span class="copyable" onclick="copyText(this,'${cid}')" title="Klikni pro kopírování">Creative ID: ${cid}</span></div>` : ''}
+          ${spend>0 ? `<div class="creative-metrics">
+            <div class="c-metric"><div class="c-metric-label">Spend</div><div class="c-metric-val">${fmt(spend)} <small style="font-size:9px;font-weight:400;color:var(--text-dim);">CZK</small></div></div>
             <div class="c-metric"><div class="c-metric-label">CTR</div><div class="c-metric-val">${fmtPct(ctr_)}</div></div>
             <div class="c-metric"><div class="c-metric-label">Nákupy</div><div class="c-metric-val green">${p||'—'}</div></div>
             <div class="c-metric"><div class="c-metric-label">ROAS</div><div class="c-metric-val ${roas_>=1?'green':''}">${roas_>0?fmt(roas_,2)+'×':'—'}</div></div>
-          </div>
+          </div>` : `<div style="font-size:11px;color:var(--text-dim);">Žádný spend ve zvoleném období</div>`}
         </div>
       </div>`;
     }).join('');
@@ -829,8 +867,10 @@ async function loadFacebook() {
     const pages = await apiFetch('/me/accounts', {fields:'id,name,access_token'});
     const pagesEl = document.getElementById('fbPages');
     if (!pages.data?.length) { pagesEl.textContent='Žádné stránky nenalezeny.'; return; }
+    const soundPages = (pages.data||[]).filter(p => /sound|stvanice|štvanice/i.test(p.name));
+    if (!soundPages.length) { pagesEl.textContent='Žádná Sound/Štvanice stránka nenalezena.'; return; }
     document.getElementById('fbAlert').style.display='none';
-    pagesEl.innerHTML = pages.data.map(p =>
+    pagesEl.innerHTML = soundPages.map(p =>
       `<button class="btn btn-dim btn-sm" style="margin:4px;" onclick="loadFbPosts('${p.id}','${p.access_token}')">${p.name}</button>`
     ).join('');
   } catch(e) {
@@ -902,8 +942,8 @@ async function loadInstagram() {
   try {
     const pages = await apiFetch('/me/accounts', {fields:'id,name,instagram_business_account,access_token'});
     const igEl = document.getElementById('igAccount');
-    const igAccounts = (pages.data||[]).filter(p => p.instagram_business_account);
-    if (!igAccounts.length) { igEl.textContent='Žádný Instagram Business účet nenalezen nebo chybí oprávnění instagram_basic.'; return; }
+    const igAccounts = (pages.data||[]).filter(p => p.instagram_business_account && /sound|stvanice|štvanice/i.test(p.name));
+    if (!igAccounts.length) { igEl.textContent='Žádný Sound/Štvanice Instagram Business účet nenalezen nebo chybí oprávnění instagram_basic.'; return; }
     document.getElementById('igAlert').style.display='none';
     igEl.innerHTML = igAccounts.map(p =>
       `<button class="btn btn-dim btn-sm" style="margin:4px;" onclick="loadIgPosts('${p.instagram_business_account.id}','${p.access_token}')">${p.name}</button>`
