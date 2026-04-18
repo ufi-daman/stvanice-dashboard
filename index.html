@@ -232,7 +232,7 @@
 <header class="header">
   <div class="header-left">
     <h1>Sound Open Air <span>Štvanice</span> — Meta Ads Dashboard</h1>
-    <div class="subtitle">YTD Jan 1 – Apr 17, 2026 · G Sound excluded · Kampaně reaktivovány 17.4</div>
+    <div class="subtitle">YTD Jan 1 – Apr 18, 2026 · G Sound excluded · Kampaně reaktivovány 17.4</div>
   </div>
   <div class="header-right">
     <div class="updated-badge">Aktualizováno <strong id="todayDate"></strong></div>
@@ -248,7 +248,7 @@
 
   <!-- STATUS ALERT -->
   <div class="alert success">
-    ✅ 17.4.2026 — Kampaně reaktivovány. Vítězná kreativa <strong>951308673908762</strong> (ROAS 23.7×) přidána do 5 adsetů. CAPI webhook aktivní.
+    ✅ Dashboard aktualizován 18.4.2026 08:00 · 40 purchases · Spend 59 565 CZK · Kampaně aktivní · Kreativa 951308673908762 v 5 adsetech
   </div>
 
   <!-- KPI SECTION -->
@@ -256,27 +256,27 @@
   <div class="kpi-row section-gap">
     <div class="kpi-card">
       <div class="kpi-label">Total Spend</div>
-      <div class="kpi-value">56 061</div>
-      <div class="kpi-sub"><span class="highlight">CZK</span> · Jan–Apr 17</div>
+      <div class="kpi-value">59 565</div>
+      <div class="kpi-sub"><span class="highlight">CZK</span> · Jan–Apr 18</div>
     </div>
     <div class="kpi-card green">
       <div class="kpi-label">Purchases</div>
-      <div class="kpi-value" style="color:var(--green)">34</div>
-      <div class="kpi-sub">+ est. 10–15 pixelový výpadek</div>
+      <div class="kpi-value" style="color:var(--green)">40</div>
+      <div class="kpi-sub">+6 od Apr 17 · výpadek pixel 31.3–6.4</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Revenue</div>
-      <div class="kpi-value" style="color:#60d8b0">33 990</div>
-      <div class="kpi-sub"><span class="highlight">CZK</span> · ticket 590 CZK</div>
+      <div class="kpi-value" style="color:#60d8b0">20 390</div>
+      <div class="kpi-sub"><span class="highlight">CZK</span> · pixel výpadek podhodnocuje</div>
     </div>
     <div class="kpi-card yellow">
       <div class="kpi-label">ROAS</div>
-      <div class="kpi-value" style="color:var(--yellow)">0.61×</div>
-      <div class="kpi-sub">Bez výpadku est. <span class="highlight">~0.75×</span></div>
+      <div class="kpi-value" style="color:var(--yellow)">0.34×</div>
+      <div class="kpi-sub">Podhodnoceno · est. real <span class="highlight">~0.65×</span></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">CPA</div>
-      <div class="kpi-value" style="font-size:18px">1 649 CZK</div>
+      <div class="kpi-value" style="font-size:18px">1 489 CZK</div>
       <div class="kpi-sub">Breakeven <span class="highlight">590 CZK</span></div>
     </div>
     <div class="kpi-card orange">
@@ -727,17 +727,17 @@
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 
 const campaigns = [
-  { name:'18/12 Event Response', spend:11143, purchases:2,  revenue:1700,  ctr:2.80, cpc:1.77, lpv:123,  checkouts:1,  status:'active'  },
-  { name:'18/12 Interest',       spend:12518, purchases:3,  revenue:4050,  ctr:3.00, cpc:1.57, lpv:196,  checkouts:1,  status:'paused'  },
-  { name:'12/2 Traffic',         spend:3499,  purchases:0,  revenue:0,     ctr:3.31, cpc:1.67, lpv:950,  checkouts:0,  status:'paused'  },
-  { name:'24/2 Traffic',         spend:8284,  purchases:12, revenue:10960, ctr:3.77, cpc:1.40, lpv:2850, checkouts:164,status:'active'  },
-  { name:'24/2 Sales',           spend:5203,  purchases:14, revenue:13880, ctr:2.94, cpc:3.08, lpv:488,  checkouts:12, status:'active'  },
-  { name:'ASC Sales 22/3',       spend:1779,  purchases:2,  revenue:1700,  ctr:2.30, cpc:3.54, lpv:94,   checkouts:1,  status:'active'  },
-  { name:'31/3 Traffic-A',       spend:3288,  purchases:0,  revenue:0,     ctr:4.14, cpc:1.31, lpv:1307, checkouts:0,  status:'paused'  },
-  { name:'31/3 Traffic-B',       spend:3829,  purchases:1,  revenue:1700,  ctr:4.12, cpc:1.33, lpv:1703, checkouts:0,  status:'paused'  },
-  { name:'24/2 Zájem',           spend:2268,  purchases:0,  revenue:0,     ctr:0.24, cpc:49.3, lpv:3,    checkouts:0,  status:'paused'  },
-  { name:'2/4 Engagement',       spend:3080,  purchases:0,  revenue:0,     ctr:0.69, cpc:6.16, lpv:4,    checkouts:0,  status:'paused'  },
-  { name:'11/4 Reach',           spend:868,   purchases:0,  revenue:0,     ctr:0.11, cpc:15.78,lpv:1,    checkouts:0,  status:'paused'  },
+  { name:'18/12 STVANICE – event',  spend:11389, purchases:2,  revenue:850,   ctr:2.83, cpc:1.74, lpv:123,  checkouts:1,  status:'active'  },
+  { name:'18/12 STVANICE – interest',spend:12518,purchases:3,  revenue:1350,  ctr:3.00, cpc:1.57, lpv:196,  checkouts:1,  status:'paused'  },
+  { name:'12/2 Traffic',            spend:3499,  purchases:0,  revenue:0,     ctr:3.31, cpc:1.67, lpv:950,  checkouts:0,  status:'paused'  },
+  { name:'24/2 Traffic',            spend:9131,  purchases:12, revenue:3650,  ctr:3.77, cpc:1.43, lpv:2850, checkouts:164,status:'active'  },
+  { name:'24/2 Sales',              spend:6519,  purchases:20, revenue:12740, ctr:2.75, cpc:3.37, lpv:488,  checkouts:12, status:'active'  },
+  { name:'ASC Sales 22/3',          spend:1779,  purchases:2,  revenue:850,   ctr:2.30, cpc:3.54, lpv:94,   checkouts:1,  status:'active'  },
+  { name:'31/3 Traffic-A',          spend:3288,  purchases:0,  revenue:0,     ctr:4.14, cpc:1.31, lpv:1307, checkouts:0,  status:'paused'  },
+  { name:'31/3 Traffic-B',          spend:4244,  purchases:1,  revenue:1700,  ctr:4.11, cpc:1.34, lpv:1703, checkouts:0,  status:'paused'  },
+  { name:'24/2 Zájem',              spend:2268,  purchases:0,  revenue:0,     ctr:0.24, cpc:49.3, lpv:3,    checkouts:0,  status:'paused'  },
+  { name:'2/4 Engagement',          spend:3426,  purchases:0,  revenue:0,     ctr:0.67, cpc:6.59, lpv:4,    checkouts:0,  status:'paused'  },
+  { name:'11/4 Reach',              spend:1152,  purchases:0,  revenue:0,     ctr:0.10, cpc:17.72,lpv:1,    checkouts:0,  status:'paused'  },
 ];
 
 const ads = [
@@ -757,7 +757,7 @@ const weekly = [
   { week:'Mar 24–30',      spend:3148, purchases:2,  revenue:850  },
   { week:'Mar 31–Apr 6',   spend:6914, purchases:0,  revenue:0    },
   { week:'Apr 7–13',       spend:6689, purchases:3,  revenue:3400 },
-  { week:'Apr 14–17',      spend:2644, purchases:5,  revenue:1790 },
+  { week:'Apr 14–18',      spend:6148, purchases:11, revenue:3540 },
 ];
 
 // ─── COUNTDOWN ────────────────────────────────────────────────────────────────
@@ -915,8 +915,8 @@ new Chart(weeklyCtx, {
 
 // ─── GANTT ───────────────────────────────────────────────────────────────────
 const ganttEl = document.getElementById('ganttContainer');
-const totalDays = 37;
-const today = new Date('2026-04-17');
+const totalDays = 35;
+const today = new Date('2026-04-18');
 
 const ganttItems = [
   { label: 'Traffic custom',    start: 0,  end: 37, color: '#2a5ab5', text: '200 CZK/den' },
