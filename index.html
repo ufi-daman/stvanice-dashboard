@@ -789,16 +789,16 @@ function renderCompareTable() {
 // ══════════════════════════════════════════════════════════════════
 async function loadCreatives() {
   const grid = document.getElementById('creativesGrid');
-  grid.innerHTML = `<div class="loading"><div class="spinner"></div>Načítám kreativy…</div>`;
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div>Načítám reklamy…</div>`;
   try {
-    // 1) Fetch ads with creative details (separate from insights — nested time_range unreliable)
+    // 1) Fetch ads — no creative fields (thumbnails blocked by FB CDN auth)
     const adsRes = await apiFetch(`/${AD_ACCOUNT}/ads`, {
-      fields: 'id,name,adset_name,campaign_name,effective_status,creative{id,thumbnail_url,image_url,title,body}',
+      fields: 'id,name,adset_name,campaign_name,effective_status',
       effective_status: JSON.stringify(['ACTIVE','PAUSED']),
-      limit: 50
+      limit: 100
     });
 
-    const adsRaw = (adsRes.data||[]).filter(a => !isGSound(a.campaign_name||'')).slice(0,30);
+    const adsRaw = (adsRes.data||[]).filter(a => !isGSound(a.campaign_name||''));
     if (!adsRaw.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné reklamy nalezeny.</div>'; return; }
 
     // 2) Fetch ad-level insights for the period
@@ -806,54 +806,64 @@ async function loadCreatives() {
       level: 'ad',
       fields: 'ad_id,spend,impressions,clicks,ctr,cpc,actions,action_values',
       time_range: timeRange(),
-      limit: 100
+      limit: 200
     });
 
     // Build insights map: ad_id → data
     const insMap = {};
     (insRes.data||[]).forEach(i => insMap[i.ad_id] = i);
 
-    // 3) Merge and render
-    grid.innerHTML = adsRaw.map(ad => {
-      const ins  = insMap[ad.id] || {};
-      const spend= parseFloat(ins.spend||0);
-      const p    = getAction(ins.actions,'purchase');
-      const rev  = getActionVal(ins.action_values,'purchase');
-      const roas_= rev>0&&spend>0 ? rev/spend : 0;
-      const ctr_ = parseFloat(ins.ctr||0);
-      const cid  = ad.creative?.id || '';
-      const thumb= ad.creative?.thumbnail_url || ad.creative?.image_url || '';
-      const isActive = ad.effective_status==='ACTIVE';
-      const title= ad.creative?.title || ad.creative?.body || '';
+    // 3) Render as table — sorted by spend desc
+    const rows = adsRaw.map(ad => {
+      const ins   = insMap[ad.id] || {};
+      const spend = parseFloat(ins.spend||0);
+      const impr  = parseFloat(ins.impressions||0);
+      const clicks= parseFloat(ins.clicks||0);
+      const ctr_  = parseFloat(ins.ctr||0);
+      const cpc_  = parseFloat(ins.cpc||0);
+      const p     = getAction(ins.actions,'purchase');
+      const rev   = getActionVal(ins.action_values,'purchase');
+      const roas_ = rev>0&&spend>0 ? rev/spend : 0;
+      return { ad, ins, spend, impr, clicks, ctr_, cpc_, p, rev, roas_ };
+    }).sort((a,b) => b.spend - a.spend);
 
-      return `<div class="creative-card">
-        <div class="creative-preview">
-          ${thumb
-            ? `<img src="${thumb}" alt="preview" crossorigin="anonymous"
-                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-               <div style="display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:11px;padding:10px;text-align:center;">
-                 <div style="font-size:24px;margin-bottom:8px;">🖼</div>
-                 <div>${title||'Náhled vyžaduje přihlášení do FB'}</div>
-               </div>`
-            : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:11px;padding:10px;text-align:center;">
-                 <div style="font-size:24px;margin-bottom:8px;">🖼</div>
-                 <div>${title||'Bez náhledu'}</div>
-               </div>`}
-          ${isActive ? '<div style="position:absolute;top:8px;right:8px;"><span class="badge badge-active">● LIVE</span></div>' : ''}
-        </div>
-        <div class="creative-info">
-          <div class="creative-name">${ad.name||'—'}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">${ad.adset_name||'—'}</div>
-          ${cid ? `<div style="margin-bottom:8px;"><span class="copyable" onclick="copyText(this,'${cid}')" title="Klikni pro kopírování">Creative ID: ${cid}</span></div>` : ''}
-          ${spend>0 ? `<div class="creative-metrics">
-            <div class="c-metric"><div class="c-metric-label">Spend</div><div class="c-metric-val">${fmt(spend)} <small style="font-size:9px;font-weight:400;color:var(--text-dim);">CZK</small></div></div>
-            <div class="c-metric"><div class="c-metric-label">CTR</div><div class="c-metric-val">${fmtPct(ctr_)}</div></div>
-            <div class="c-metric"><div class="c-metric-label">Nákupy</div><div class="c-metric-val green">${p||'—'}</div></div>
-            <div class="c-metric"><div class="c-metric-label">ROAS</div><div class="c-metric-val ${roas_>=1?'green':''}">${roas_>0?fmt(roas_,2)+'×':'—'}</div></div>
-          </div>` : `<div style="font-size:11px;color:var(--text-dim);">Žádný spend ve zvoleném období</div>`}
-        </div>
-      </div>`;
-    }).join('');
+    grid.innerHTML = `<div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th>
+          <th>Reklama</th>
+          <th>Ad Set</th>
+          <th>Kampaň</th>
+          <th>Spend CZK</th>
+          <th>Imprese</th>
+          <th>Kliky</th>
+          <th>CTR</th>
+          <th>CPC</th>
+          <th>Nákupy</th>
+          <th>Revenue</th>
+          <th>ROAS</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(({ad,spend,impr,clicks,ctr_,cpc_,p,rev,roas_}) => {
+            const isActive = ad.effective_status === 'ACTIVE';
+            return `<tr>
+              <td>${isActive ? '<span class="badge badge-active">● LIVE</span>' : statusBadge(ad.effective_status)}</td>
+              <td style="max-width:180px;white-space:normal;font-weight:500;">${ad.name||'—'}</td>
+              <td style="color:var(--text-dim);font-size:11px;max-width:140px;white-space:normal;">${ad.adset_name||'—'}</td>
+              <td style="color:var(--text-dim);font-size:11px;max-width:140px;white-space:normal;">${ad.campaign_name||'—'}</td>
+              <td style="color:#c8a0ff;font-weight:600;">${spend>0?fmt(spend):'—'}</td>
+              <td>${impr>0?fmt(impr):'—'}</td>
+              <td>${clicks>0?fmt(clicks):'—'}</td>
+              <td>${ctr_>0?fmtPct(ctr_):'—'}</td>
+              <td>${cpc_>0?fmt(cpc_,2)+' CZK':'—'}</td>
+              <td style="color:var(--green);font-weight:600;">${p||'—'}</td>
+              <td>${rev>0?fmt(rev)+' CZK':'—'}</td>
+              <td>${roasBadge(roas_)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
   } catch(e) {
     grid.innerHTML = `<div style="color:var(--red);padding:20px;">Chyba: ${e.message||JSON.stringify(e)}</div>`;
   }
@@ -886,8 +896,8 @@ async function loadFbPosts(pageId, pageToken) {
     const until = Math.floor(new Date(dateTo).getTime()/1000);
     const d = await apiFetch(`/${pageId}/posts`, {
       access_token: pageToken,
-      fields: 'message,created_time,full_picture,insights.metric(post_impressions_organic,post_impressions_paid,post_engagements,post_reach_organic,post_reach_paid)',
-      since, until, limit: 20
+      fields: 'message,created_time,insights.metric(post_impressions_organic,post_impressions_paid,post_engagements,post_reach_organic,post_reach_paid)',
+      since, until, limit: 30
     });
     renderFbPosts(d.data||[]);
   } catch(e) {
@@ -898,41 +908,50 @@ async function loadFbPosts(pageId, pageToken) {
 function renderFbPosts(posts) {
   const grid = document.getElementById('fbPostGrid');
   if (!posts.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné příspěvky v tomto období.</div>'; return; }
-  grid.innerHTML = posts.map(p => {
-    const ins = {};
-    (p.insights?.data||[]).forEach(i => ins[i.name] = i.values?.[0]?.value || 0);
-    const organic = ins.post_impressions_organic||0;
-    const paid    = ins.post_impressions_paid||0;
-    const total   = organic+paid||1;
-    const engag   = ins.post_engagements||0;
-    const date    = new Date(p.created_time).toLocaleDateString('cs-CZ');
-    return `<div class="post-card">
-      <div class="post-header">
-        ${p.full_picture ? `<img class="post-thumb" src="${p.full_picture}">` : '<div class="post-thumb"></div>'}
-        <div class="post-meta">
-          <div class="post-date">${date}</div>
-          <div class="post-caption">${p.message||'(bez textu)'}</div>
-        </div>
-      </div>
-      <div class="post-bars">
-        <div class="bar-row">
-          <div class="bar-label">Organický</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(organic/total*100)}%;background:var(--green);"></div></div>
-          <div class="bar-val" style="color:var(--green)">${fmt(organic)}</div>
-        </div>
-        <div class="bar-row">
-          <div class="bar-label">Placený</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(paid/total*100)}%;background:var(--blue);"></div></div>
-          <div class="bar-val" style="color:var(--blue)">${fmt(paid)}</div>
-        </div>
-        <div class="bar-row">
-          <div class="bar-label">Engagement</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,Math.round(engag/total*100))}%;background:var(--orange);"></div></div>
-          <div class="bar-val" style="color:var(--orange)">${fmt(engag)}</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  grid.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Datum</th>
+      <th>Text příspěvku</th>
+      <th>Org. imprese</th>
+      <th>Placené imprese</th>
+      <th>Org. dosah</th>
+      <th>Placený dosah</th>
+      <th>Engagement</th>
+      <th>Org. %</th>
+    </tr></thead>
+    <tbody>
+    ${posts.map(p => {
+      const ins = {};
+      (p.insights?.data||[]).forEach(i => ins[i.name] = i.values?.[0]?.value || 0);
+      const organic  = ins.post_impressions_organic||0;
+      const paid     = ins.post_impressions_paid||0;
+      const rOrg     = ins.post_reach_organic||0;
+      const rPaid    = ins.post_reach_paid||0;
+      const engag    = ins.post_engagements||0;
+      const total    = organic+paid||1;
+      const orgPct   = Math.round(organic/total*100);
+      const date     = new Date(p.created_time).toLocaleDateString('cs-CZ');
+      const msg      = (p.message||'(bez textu)').slice(0,80) + ((p.message||'').length>80?'…':'');
+      return `<tr>
+        <td style="white-space:nowrap;color:var(--text-dim);">${date}</td>
+        <td style="max-width:220px;white-space:normal;font-size:11px;">${msg}</td>
+        <td style="color:var(--green);font-weight:600;">${fmt(organic)}</td>
+        <td style="color:var(--blue);font-weight:600;">${fmt(paid)}</td>
+        <td style="color:var(--green);">${fmt(rOrg)}</td>
+        <td style="color:var(--blue);">${fmt(rPaid)}</td>
+        <td style="color:var(--orange);">${fmt(engag)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+              <div style="width:${orgPct}%;height:100%;background:var(--green);border-radius:3px;"></div>
+            </div>
+            <span style="font-size:10px;color:var(--text-dim);white-space:nowrap;">${orgPct}%</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -959,8 +978,8 @@ async function loadIgPosts(igId, pageToken) {
   try {
     const d = await apiFetch(`/${igId}/media`, {
       access_token: pageToken,
-      fields: 'timestamp,media_type,caption,thumbnail_url,media_url,like_count,comments_count,insights.metric(impressions,reach,saved,engagement)',
-      limit: 20
+      fields: 'timestamp,media_type,caption,like_count,comments_count,insights.metric(impressions,reach,saved,engagement)',
+      limit: 50
     });
     renderIgPosts(d.data||[]);
   } catch(e) {
@@ -971,48 +990,50 @@ async function loadIgPosts(igId, pageToken) {
 function renderIgPosts(posts) {
   const grid = document.getElementById('igPostGrid');
   if (!posts.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné příspěvky v tomto období.</div>'; return; }
-  grid.innerHTML = posts.filter(p => {
+  const filtered = posts.filter(p => {
     const d = new Date(p.timestamp);
     return d >= new Date(dateFrom) && d <= new Date(dateTo);
-  }).slice(0,20).map(p => {
-    const ins = {};
-    (p.insights?.data||[]).forEach(i => { ins[i.name] = i.values?.[0]?.value || 0; });
-    const impr   = ins.impressions||0;
-    const reach  = ins.reach||0;
-    const saved  = ins.saved||0;
-    const engag  = ins.engagement||0;
-    const date   = new Date(p.timestamp).toLocaleDateString('cs-CZ');
-    const thumb  = p.thumbnail_url || p.media_url || '';
-    const maxVal = Math.max(impr,1);
-    return `<div class="post-card">
-      <div class="post-header">
-        ${thumb ? `<img class="post-thumb" src="${thumb}" onerror="this.style.display='none'">` : '<div class="post-thumb"></div>'}
-        <div class="post-meta">
-          <div class="post-date">${date} · ${p.media_type||''}</div>
-          <div class="post-caption">${p.caption||'(bez textu)'}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
-        ${[['❤️ Likes',p.like_count||0,'var(--red)'],['💬 Komentáře',p.comments_count||0,'var(--blue)'],['📥 Uloženo',saved,'var(--yellow)'],['👁 Dosah',reach,'var(--green)']].map(([k,v,c])=>`
-          <div style="background:var(--bg2);border-radius:6px;padding:6px 10px;text-align:center;min-width:70px;">
-            <div style="font-size:10px;color:var(--text-dim);">${k}</div>
-            <div style="font-size:15px;font-weight:700;color:${c};">${fmt(v)}</div>
-          </div>`).join('')}
-      </div>
-      <div class="post-bars" style="margin-top:10px;">
-        <div class="bar-row">
-          <div class="bar-label">Imprese</div>
-          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--blue);"></div></div>
-          <div class="bar-val">${fmt(impr)}</div>
-        </div>
-        <div class="bar-row">
-          <div class="bar-label">Engagement</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,Math.round(engag/maxVal*100))}%;background:var(--orange);"></div></div>
-          <div class="bar-val">${fmt(engag)}</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  });
+  if (!filtered.length) { grid.innerHTML='<div style="color:var(--text-dim);padding:20px;">Žádné příspěvky ve zvoleném období.</div>'; return; }
+  grid.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Datum</th>
+      <th>Typ</th>
+      <th>Text příspěvku</th>
+      <th>❤️ Likes</th>
+      <th>💬 Komentáře</th>
+      <th>👁 Dosah</th>
+      <th>Imprese</th>
+      <th>📥 Uloženo</th>
+      <th>Engagement</th>
+      <th>Eng. rate</th>
+    </tr></thead>
+    <tbody>
+    ${filtered.map(p => {
+      const ins = {};
+      (p.insights?.data||[]).forEach(i => { ins[i.name] = i.values?.[0]?.value || 0; });
+      const impr   = ins.impressions||0;
+      const reach  = ins.reach||0;
+      const saved  = ins.saved||0;
+      const engag  = ins.engagement||0;
+      const engRate= reach>0 ? (engag/reach*100).toFixed(1)+'%' : '—';
+      const date   = new Date(p.timestamp).toLocaleDateString('cs-CZ');
+      const cap    = (p.caption||'(bez textu)').slice(0,80) + ((p.caption||'').length>80?'…':'');
+      return `<tr>
+        <td style="white-space:nowrap;color:var(--text-dim);">${date}</td>
+        <td style="font-size:10px;color:var(--text-dim);white-space:nowrap;">${p.media_type||'—'}</td>
+        <td style="max-width:200px;white-space:normal;font-size:11px;">${cap}</td>
+        <td style="color:var(--red);font-weight:600;">${fmt(p.like_count||0)}</td>
+        <td style="color:var(--blue);">${fmt(p.comments_count||0)}</td>
+        <td style="color:var(--green);font-weight:600;">${fmt(reach)}</td>
+        <td>${fmt(impr)}</td>
+        <td style="color:var(--yellow);">${fmt(saved)}</td>
+        <td style="color:var(--orange);font-weight:600;">${fmt(engag)}</td>
+        <td style="color:var(--text-dim);">${engRate}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
 }
 
 // ══════════════════════════════════════════════════════════════════
