@@ -160,6 +160,29 @@ tr.selected td{background:rgba(79,142,247,.07);}
 .alert-warn{background:rgba(241,196,15,.1);border:1px solid rgba(241,196,15,.3);color:#fde68a;}
 .alert-success{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.3);color:#86efac;}
 
+/* ─── REPORT ─── */
+.report-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px;}
+.report-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.report-title{font-size:13px;font-weight:700;color:#fff;}
+.report-date{font-size:11px;color:var(--text-dim);}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.report-insight{border-radius:8px;padding:12px 14px;border-left:3px solid;}
+.report-insight.green{background:rgba(46,204,113,.07);border-color:var(--green);}
+.report-insight.red{background:rgba(231,76,60,.07);border-color:var(--red);}
+.report-insight.yellow{background:rgba(241,196,15,.07);border-color:var(--yellow);}
+.report-insight.blue{background:rgba(79,142,247,.07);border-color:var(--blue);}
+.report-insight-label{font-size:10px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;font-weight:600;}
+.report-insight.green .report-insight-label{color:var(--green);}
+.report-insight.red .report-insight-label{color:var(--red);}
+.report-insight.yellow .report-insight-label{color:var(--yellow);}
+.report-insight.blue .report-insight-label{color:var(--blue);}
+.report-insight-text{font-size:12px;color:var(--text);line-height:1.5;}
+.report-recs{border-top:1px solid var(--border);padding-top:12px;}
+.report-recs-title{font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;}
+.rec-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:12px;color:var(--text);border-bottom:1px solid rgba(42,42,69,.4);}
+.rec-item:last-child{border:none;}
+.rec-icon{font-size:14px;flex-shrink:0;line-height:1.3;}
+
 /* ─── MOBILE ─── */
 @media(max-width:800px){
   .grid-6,.grid-4{grid-template-columns:repeat(2,1fr);}
@@ -234,6 +257,19 @@ tr.selected td{background:rgba(79,142,247,.07);}
     <div class="kpi-card yellow"><div class="kpi-label">ROAS</div><div class="kpi-value" id="kpi-roas" style="color:var(--yellow)">—</div><div class="kpi-sub">target ≥ 1.0×</div></div>
     <div class="kpi-card"><div class="kpi-label">CTR avg.</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-sub">CPC <span class="hl" id="kpi-cpc">—</span></div></div>
     <div class="kpi-card orange"><div class="kpi-label">Dní do eventu</div><div class="kpi-value" id="kpi-days" style="color:var(--orange)">—</div><div class="kpi-sub">23.05.2026</div></div>
+  </div>
+
+  <!-- REPORT -->
+  <div id="reportBox" style="display:none;" class="report-box">
+    <div class="report-header">
+      <div class="report-title">📋 Shrnutí &amp; Doporučení</div>
+      <div class="report-date" id="reportDate"></div>
+    </div>
+    <div class="report-grid" id="reportInsights"></div>
+    <div class="report-recs">
+      <div class="report-recs-title">Doporučené akce</div>
+      <div id="reportRecs"></div>
+    </div>
   </div>
 
   <div class="section-title">Kampaně v období</div>
@@ -557,7 +593,8 @@ async function loadOverview() {
       </tr>`;
     }).join('');
 
-    // Populate compare tab
+    // Report + Compare
+    generateReport(rows);
     buildCompareCards(rows);
 
   } catch(e) {
@@ -936,6 +973,113 @@ function renderIgPosts(posts) {
       </div>
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// REPORT — automatické shrnutí + doporučení
+// ══════════════════════════════════════════════════════════════════
+function generateReport(rows) {
+  if (!rows.length) return;
+
+  // ── Aggregate ──
+  let totalSpend=0, totalPurch=0, totalRev=0, totalClicks=0, totalImpr=0;
+  rows.forEach(r => {
+    totalSpend += parseFloat(r.spend||0);
+    totalPurch += getAction(r.actions,'purchase');
+    totalRev   += getActionVal(r.action_values,'purchase');
+    totalClicks+= parseFloat(r.clicks||0);
+    totalImpr  += parseFloat(r.impressions||0);
+  });
+  const roas  = totalRev>0 ? totalRev/totalSpend : 0;
+  const cpa   = totalPurch>0 ? totalSpend/totalPurch : 0;
+  const ctr   = totalImpr>0 ? totalClicks/totalImpr*100 : 0;
+  const daysLeft = Math.ceil((EVENT_DATE-new Date())/86400000);
+
+  // ── Best / Worst ──
+  const withPurch = rows.filter(r=>getAction(r.actions,'purchase')>0);
+  const sorted = withPurch.sort((a,b)=>{
+    const ra = getActionVal(a.action_values,'purchase')/parseFloat(a.spend);
+    const rb = getActionVal(b.action_values,'purchase')/parseFloat(b.spend);
+    return rb-ra;
+  });
+  const best  = sorted[0];
+  const worst = rows.sort((a,b)=>parseFloat(b.spend)-parseFloat(a.spend))
+                    .find(r=>getAction(r.actions,'purchase')===0 && parseFloat(r.spend)>500);
+
+  // ── Insights ──
+  const bestRoas = best ? getActionVal(best.action_values,'purchase')/parseFloat(best.spend) : 0;
+  const insights = [];
+
+  // ROAS insight
+  if (roas >= 1) {
+    insights.push({type:'green', label:'✓ ROAS nad breakeven', text:`${fmt(roas,2)}× — kampaně generují zisk. Revenue ${fmt(totalRev)} CZK za ${fmt(totalSpend)} CZK spend.`});
+  } else if (roas >= 0.5) {
+    insights.push({type:'yellow', label:'⚠ ROAS pod breakeven', text:`${fmt(roas,2)}× (target ≥ 1.0×). Revenue ${fmt(totalRev)} CZK za ${fmt(totalSpend)} CZK. Pixel mohl podhodnocovat konverze.`});
+  } else {
+    insights.push({type:'red', label:'✗ ROAS kriticky nízký', text:`${fmt(roas,2)}× — kampaně zatím nepokrývají spend. CPA ${fmt(cpa)} CZK vs. breakeven 590 CZK.`});
+  }
+
+  // Best performer
+  if (best) {
+    insights.push({type:'green', label:'⭐ Nejlepší kampaň', text:`${best.campaign_name} — ROAS ${fmt(bestRoas,2)}×, ${getAction(best.actions,'purchase')} nákupů za ${fmt(parseFloat(best.spend))} CZK.`});
+  }
+
+  // Urgency
+  if (daysLeft <= 14) {
+    insights.push({type:'red', label:'🔴 Urgence', text:`${daysLeft} dní do eventu. Zvyš budgety remarketing kampaní — warm audience konvertuje 3–5× lépe než cold.`});
+  } else if (daysLeft <= 30) {
+    insights.push({type:'yellow', label:'⏰ Countdown', text:`${daysLeft} dní do eventu (23.5.). Čas pro FOMO messaging a škálování nejlepších adsetů.`});
+  } else {
+    insights.push({type:'blue', label:'📅 Countdown', text:`${daysLeft} dní do eventu. Optimalizuj, testuj kreativy, buduj warm audience.`});
+  }
+
+  // Wasted spend
+  if (worst) {
+    insights.push({type:'red', label:'💸 Wasted spend', text:`${worst.campaign_name} — ${fmt(parseFloat(worst.spend))} CZK bez jediného nákupu. Zvaž pozastavení nebo změnu kreatívy.`});
+  }
+
+  // CTR
+  if (ctr > 3) {
+    insights.push({type:'green', label:'✓ CTR výborný', text:`${fmtPct(ctr)} — kreativy silně rezonují s publikem. Průměr Meta je ~1.5%. Škáluj budget.`});
+  } else if (ctr < 1.5) {
+    insights.push({type:'yellow', label:'⚠ CTR podprůměrný', text:`${fmtPct(ctr)} — kreativy potřebují refresh nebo lepší targeting. Otestuj nové formáty.`});
+  }
+
+  // ── Recommendations ──
+  const recs = [];
+
+  if (best && bestRoas >= 2) {
+    recs.push({icon:'🚀', text:`Škáluj <strong>${best.campaign_name}</strong> — ROAS ${fmt(bestRoas,2)}× je silný. Zvyš denní budget o 20–30 % každé 3 dny.`});
+  }
+  if (worst) {
+    recs.push({icon:'⏸', text:`Pozastav nebo reviduj <strong>${worst.campaign_name}</strong> — ${fmt(parseFloat(worst.spend))} CZK bez konverze. Vyměň kreativu za vítěznou (ID 951308673908762).`});
+  }
+  if (daysLeft <= 21) {
+    recs.push({icon:'🎯', text:`Spusť <strong>FOMO remarketing</strong> — lidé kteří navštívili GoOut ale nekoupili. CPA u warm audience bývá 3–5× nižší.`});
+  }
+  if (roas < 1) {
+    recs.push({icon:'📊', text:`ROAS ${fmt(roas,2)}× může být podhodnocen kvůli výpadku pixelu (31.3–6.4). Porovnej s GoOut prodejní dashboard pro skutečné číslo.`});
+  }
+  recs.push({icon:'💡', text:`Nejlepší placement: <strong>Facebook Feed</strong> (91 % nákupů). Reels a Audience Network nevykazují konverze — vyloučit z nových adsetů.`});
+  if (daysLeft <= 30) {
+    recs.push({icon:'⚡', text:`S ${daysLeft} dny do eventu přesuň 60 % budgetu do <strong>Sales kampaní</strong>, 25 % do <strong>Remarketing</strong>, 15 % do Event Response.`});
+  }
+
+  // ── Render ──
+  document.getElementById('reportBox').style.display = 'block';
+  document.getElementById('reportDate').textContent =
+    `${dateFrom} → ${dateTo} · ${daysLeft} dní do eventu`;
+
+  document.getElementById('reportInsights').innerHTML = insights.slice(0,4).map(i =>
+    `<div class="report-insight ${i.type}">
+      <div class="report-insight-label">${i.label}</div>
+      <div class="report-insight-text">${i.text}</div>
+    </div>`
+  ).join('');
+
+  document.getElementById('reportRecs').innerHTML = recs.map(r =>
+    `<div class="rec-item"><div class="rec-icon">${r.icon}</div><div>${r.text}</div></div>`
+  ).join('');
 }
 
 // ══ TABS ══════════════════════════════════════════════════════════
