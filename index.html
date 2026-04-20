@@ -239,7 +239,7 @@ tr.selected td{background:rgba(79,142,247,.07);}
 <!-- ── TABS ── -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('overview')">📊 Přehled</div>
-  <div class="tab" onclick="switchTab('funnel')">🔻 Funnel (aktivní)</div>
+  <div class="tab" onclick="switchTab('funnel')">🔻 Funnel</div>
   <div class="tab" onclick="switchTab('compare')">⚖️ Porovnat kampaně</div>
   <div class="tab" onclick="switchTab('creatives')">🎨 Kreativy</div>
   <div class="tab" onclick="switchTab('facebook')">👤 Facebook příspěvky</div>
@@ -295,8 +295,34 @@ tr.selected td{background:rgba(79,142,247,.07);}
 
 <!-- ══ TAB: FUNNEL ══ -->
 <div class="tab-pane" id="tab-funnel">
-  <div class="alert alert-info">🔴 Zobrazuje data pouze z <strong>aktivních kampaní</strong> ve zvoleném období.</div>
-  <div class="section-title">Conversion Funnel — aktivní kampaně</div>
+
+  <!-- Toggle aktivní / celkový -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+    <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <button id="funnelToggleActive" onclick="switchFunnelMode('active')"
+        style="padding:7px 18px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--blue);color:#fff;transition:all .15s;">
+        ● Aktivní kampaně
+      </button>
+      <button id="funnelToggleAll" onclick="switchFunnelMode('all')"
+        style="padding:7px 18px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--card);color:var(--text-dim);transition:all .15s;">
+        Všechny kampaně
+      </button>
+    </div>
+    <div id="funnelModeLabel" style="font-size:11px;color:var(--text-dim);">Zobrazení: pouze aktivní kampaně ve zvoleném období</div>
+  </div>
+
+  <!-- Info box: role traffic kampaní -->
+  <div id="trafficInfoBox" style="display:none;background:linear-gradient(135deg,rgba(79,142,247,.08),rgba(79,142,247,.03));border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12px;line-height:1.7;">
+    <div style="font-weight:700;color:var(--blue);margin-bottom:6px;">💡 Proč traffic kampaně nejdou rovnou vypnout</div>
+    <div style="color:var(--text-dim);">
+      Traffic kampaně <strong style="color:var(--text)">plní horní část funnelu</strong> — přivádějí nové lidi na GoOut stránku a budují retargetingové audience (návštěvníci LP, video viewers). Bez nich Sales/Retarget kampaně postupně vysychají.<br>
+      <span style="color:var(--orange)">⚠ Pokud je zastavíš bez náhrady:</span> Sales kampaně budou mít stále menší audience → ROAS začne klesat za 7–14 dní.<br>
+      <strong style="color:var(--text)">Doporučení:</strong> Místo vypnutí snižuj budget traffic kampaní na min. (100–150 Kč/den) a přesuň hlavní peníze do Sales/ASC. Neodpojuj přísun nových lidí úplně — 33 dní do eventu je stále dost na konverze.
+    </div>
+  </div>
+
+  <!-- Funnel vizuál -->
+  <div class="section-title" id="funnelSectionTitle">Conversion Funnel — aktivní kampaně</div>
   <div class="card section-gap" id="funnelCard">
     <div class="loading" id="funnelLoading" style="display:none;"><div class="spinner"></div>Načítám funnel data…</div>
     <div id="funnelViz" style="display:none;">
@@ -306,7 +332,8 @@ tr.selected td{background:rgba(79,142,247,.07);}
     <div id="funnelEmpty" style="text-align:center;padding:40px;color:var(--text-dim);">Vlož token a klikni Načíst</div>
   </div>
 
-  <div class="section-title">Ad Sety aktivních kampaní</div>
+  <!-- Ad set tabulka -->
+  <div class="section-title" id="funnelTableTitle">Ad Sety aktivních kampaní</div>
   <div class="card section-gap">
     <div class="table-wrap">
       <table id="funnelTable">
@@ -618,39 +645,80 @@ async function loadOverview() {
 // ══════════════════════════════════════════════════════════════════
 // TAB: FUNNEL
 // ══════════════════════════════════════════════════════════════════
+let funnelMode = 'active'; // 'active' | 'all'
+
+function switchFunnelMode(mode) {
+  funnelMode = mode;
+  const btnActive = document.getElementById('funnelToggleActive');
+  const btnAll    = document.getElementById('funnelToggleAll');
+  const label     = document.getElementById('funnelModeLabel');
+  const infoBox   = document.getElementById('trafficInfoBox');
+  const secTitle  = document.getElementById('funnelSectionTitle');
+  const tblTitle  = document.getElementById('funnelTableTitle');
+
+  if (mode === 'active') {
+    btnActive.style.background = 'var(--blue)'; btnActive.style.color = '#fff';
+    btnAll.style.background = 'var(--card)'; btnAll.style.color = 'var(--text-dim)';
+    label.textContent = 'Zobrazení: pouze aktivní kampaně ve zvoleném období';
+    infoBox.style.display = 'none';
+    secTitle.textContent = 'Conversion Funnel — aktivní kampaně';
+    tblTitle.textContent = 'Ad Sety aktivních kampaní';
+  } else {
+    btnAll.style.background = 'var(--blue)'; btnAll.style.color = '#fff';
+    btnActive.style.background = 'var(--card)'; btnActive.style.color = 'var(--text-dim)';
+    label.textContent = 'Zobrazení: všechny kampaně (aktivní + pozastavené) za zvolené období';
+    infoBox.style.display = 'block';
+    secTitle.textContent = 'Conversion Funnel — všechny kampaně';
+    tblTitle.textContent = 'Ad Sety všech kampaní';
+  }
+  loadFunnel();
+}
+
 async function loadFunnel() {
   document.getElementById('funnelLoading').style.display = 'block';
   document.getElementById('funnelViz').style.display = 'none';
   document.getElementById('funnelEmpty').style.display = 'none';
 
   try {
-    // Fetch active campaigns first
-    const camps = await apiFetch(`/${AD_ACCOUNT}/campaigns`, {
-      fields: 'id,name,effective_status',
-      limit: 100
-    });
-    const activeCampIds = (camps.data||[])
-      .filter(c => c.effective_status==='ACTIVE' && !isGSound(c.name))
-      .map(c => c.id);
+    let filterParam = null;
 
-    if (!activeCampIds.length) {
-      document.getElementById('funnelLoading').style.display = 'none';
-      document.getElementById('funnelEmpty').style.display = 'block';
-      document.getElementById('funnelEmpty').textContent = 'Žádné aktivní kampaně nalezeny.';
-      return;
+    if (funnelMode === 'active') {
+      // Fetch only active campaign IDs
+      const camps = await apiFetch(`/${AD_ACCOUNT}/campaigns`, {
+        fields: 'id,name,effective_status',
+        limit: 100
+      });
+      const activeCampIds = (camps.data||[])
+        .filter(c => c.effective_status==='ACTIVE' && !isGSound(c.name))
+        .map(c => c.id);
+
+      if (!activeCampIds.length) {
+        document.getElementById('funnelLoading').style.display = 'none';
+        document.getElementById('funnelEmpty').style.display = 'block';
+        document.getElementById('funnelEmpty').textContent = 'Žádné aktivní kampaně nalezeny.';
+        return;
+      }
+      filterParam = JSON.stringify([{field:'campaign.id',operator:'IN',value:activeCampIds}]);
     }
 
-    // Fetch adset insights for active campaigns
-    const fields = 'adset_id,adset_name,campaign_name,spend,impressions,clicks,actions,action_values';
-    const d = await apiFetch(`/${AD_ACCOUNT}/insights`, {
+    // Fetch adset insights
+    const insParams = {
       level: 'adset',
-      fields,
+      fields: 'adset_id,adset_name,campaign_name,campaign_id,spend,impressions,clicks,actions,action_values',
       time_range: timeRange(),
       limit: 200,
-      filtering: JSON.stringify([{field:'campaign.id',operator:'IN',value:activeCampIds}])
-    });
+    };
+    if (filterParam) insParams.filtering = filterParam;
 
+    const d = await apiFetch(`/${AD_ACCOUNT}/insights`, insParams);
     const rows = (d.data||[]).filter(r => !isGSound(r.campaign_name||''));
+
+    if (!rows.length) {
+      document.getElementById('funnelLoading').style.display = 'none';
+      document.getElementById('funnelEmpty').style.display = 'block';
+      document.getElementById('funnelEmpty').textContent = 'Žádná data pro zvolené období.';
+      return;
+    }
 
     // Aggregate funnel
     let impr=0,clicks=0,lpv=0,checkout=0,purchases=0,revenue=0,spend=0;
@@ -701,14 +769,19 @@ async function loadFunnel() {
     document.getElementById('funnelLoading').style.display = 'none';
     document.getElementById('funnelViz').style.display = 'block';
 
-    // Adset table
+    // Adset table — add campaign type tag in 'all' mode
     const tbody = document.getElementById('funnelBody');
     tbody.innerHTML = rows.sort((a,b)=>parseFloat(b.spend)-parseFloat(a.spend)).map(r => {
-      const p = getAction(r.actions,'purchase');
-      const rev = getActionVal(r.action_values,'purchase');
+      const p    = getAction(r.actions,'purchase');
+      const rev  = getActionVal(r.action_values,'purchase');
       const roas_ = rev>0 ? rev/parseFloat(r.spend) : 0;
+      const campType = /traffic|traffic/i.test(r.campaign_name||'')
+        ? '<span style="font-size:9px;background:rgba(79,142,247,.15);color:var(--blue);padding:1px 5px;border-radius:3px;margin-left:4px;">TRAFFIC</span>'
+        : /sales|prodej|asc/i.test(r.campaign_name||'')
+          ? '<span style="font-size:9px;background:rgba(46,204,113,.15);color:var(--green);padding:1px 5px;border-radius:3px;margin-left:4px;">SALES</span>'
+          : '';
       return `<tr>
-        <td style="color:var(--text-dim);font-size:11px;">${r.campaign_name||'—'}</td>
+        <td style="color:var(--text-dim);font-size:11px;">${r.campaign_name||'—'}${funnelMode==='all'?campType:''}</td>
         <td><strong>${r.adset_name||'—'}</strong></td>
         <td style="color:#c8a0ff">${fmt(parseFloat(r.spend||0))}</td>
         <td>${fmt(parseFloat(r.impressions||0))}</td>
